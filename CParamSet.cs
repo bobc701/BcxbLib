@@ -1,0 +1,418 @@
+﻿//#define IOS
+
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using static System.Math;
+#if WINDOWS
+   using System.Drawing;
+#elif IOS
+   using CoreGraphics;
+   using UIKit;
+#endif
+
+
+namespace BCX.BCXB {
+
+   public class BarSegment { public double left, width; }
+   //public enum TLR { none = 0, hr = 1, b3 = 2, b2 = 3, b1 = 4, bb = 5, oth = 6, so = 7, GoodPlay = 1, BadPlay = 2 }
+      public enum TLR { none = 0, 
+         hr = 1, b3 = 2, b2 = 3, b1 = 4, bb = 5,
+         fo = 6, ld = 7, pu = 8, gr = 9, so = 10,
+         GoodPlay = 1, BadPlay = 2 }
+
+   
+   public abstract class CParamSet {
+
+      private double[] barWidths = new double[7];
+      public int SegmentCount;
+      public string[] SegmentLabels;
+      #if WINDOWS
+         public Color[] SegmentColors;
+      #elif IOS  
+         public UIColor[] SegmentColors;  
+      #endif     
+      public abstract double[] GetWidthArray();
+      public abstract CDiceRoll RollTheDice(Random rn1);
+      public abstract CDiceRoll GetTlr(TLR tlr, Random rn1);
+   
+   }
+
+
+   /// <summary>
+   /// This is the core parameter calculator for batters.
+   /// For input it uses the 2 args, the batter's actual stats (batStat), and
+   /// the league-level CParamSet (lgParam).
+   /// It's output is the parameters, hr, b3, b2, ...
+   /// </summary>
+   public class CHittingParamSet : CParamSet {
+
+      public double h, hr, b3, b2, bb, hbp=0.008, oth, fo, ld, pu, gr, so, sb;
+      public double fPitBase;     //Scales 3ip+h+w to bfp
+      public double fSacBunt;     //Converts sac bunts to failed sac bunts
+      public static double[] othSplits = { .370, .180, .200, .250 };
+
+      //public double[] barWidths = new double[7];
+
+
+      // Factors for missing stats (based on 1970 data)...
+      private const double FAC_SF = 0.0075;       //Apply to AB
+      private const double FAC_IBB = 0.1067;      //Apply to BB
+      private const double FAC_CS = 0.565;        //Apply to SB
+      private const double FAC_SO = 0.1693;       //Apply to AB
+      private const double FAC_SACBUNT = 0.3333;  //Ratio of failed sac bunts to sac bunts
+      private const double FAC_HBP = 0.0062;      //Apply tp AB
+      private const double FAC_SH = 0.0071;       //Apply to AB (before FAC_SACBUNT) (Excludes P's)
+      private const double ADJ_FOR_OTHER_HITS = 0.015;
+
+
+      public CHittingParamSet(
+         double _h, double _hr, double _b3, double _b2,
+         double _bb, double _so, double _oth, double _sb,
+         double _fo, double _ld, double _pu, double _gr) {
+      // ------------------------------------------------------------------------
+         h = _h; hr = _hr; b3 = _b3; b2 = _b2; bb = _bb; so = _so;
+         oth = _oth;
+         sb = _sb;
+         fo = _fo; ld = _ld; pu = _pu; gr = _gr;
+         SetupSegments();
+      }
+
+
+      public CHittingParamSet() {
+      // ------------------------------------------------------------------------
+         h = 0.0; hr = 0.0; b3 = 0.0; b2 = 0.0; bb = 0.0; so = 0.0;
+         oth = 0.0; sb = 0.0;
+         fo = 0.0; ld = 0.0; pu = 0.0; gr = 0.0;
+         SetupSegments();
+
+      }
+
+
+      private void SetupSegments() {
+      // -----------------------------------
+         SegmentCount = 10; //They are numbered 1 to SegmentCount.
+         SegmentLabels = new string[] { 
+            "n/a", "hr", "3b", "2b", "1b", "bb", "fl", "ld", "pu", "gr", "so" };
+         #if WINDOWS
+            SegmentColors = new Color[] {
+               Color.White,
+               Color.Red, Color.Yellow, Color.Blue, Color.LightGreen,
+               Color.Brown, Color.LightGray, Color.LightGray, Color.LightGray, Color.LightGray, Color.Black};
+         #elif IOS
+            SegmentColors = new UIColor[] {
+               UIColor.White,
+               UIColor.Red, UIColor.Yellow, UIColor.Blue, UIColor.Green,
+               UIColor.Brown, UIColor.LightGray, UIColor.LightGray, UIColor.LightGray, 
+               UIColor.LightGray, UIColor.Black};
+
+         #endif
+
+      }
+
+      public void CombineParameters(
+         CHittingParamSet bpar, CHittingParamSet ppar, CHittingParamSet mean) {
+      // --------------------------------------------------------------------
+      // #1605.01:
+      // This is where batter & pitcher parameters are combined.
+      // bpar is batter's parameters, ppar is pitcher's.
+      // Also uses mean, which is league mean.
+      // --------------------------------------------------------------------
+         this.h = Round(bpar.h * ppar.h / mean.h, 4);
+         this.bb = Round(bpar.bb * ppar.bb / mean.bb, 4);
+         this.so = Round(bpar.so * ppar.so / mean.so, 4);
+         this.b2 = bpar.b2;
+         this.b3 = bpar.b3;
+         this.hr = Round(bpar.hr * ppar.hr / mean.hr, 4);
+         this.oth = Round(1.0 - (this.h + this.bb + this.so), 4);
+         this.sb = bpar.sb;
+
+      // Split oth into the various 'out' components...
+         this.fo = Round(this.oth * CHittingParamSet.othSplits[0], 4);
+         this.ld = Round(this.oth * CHittingParamSet.othSplits[1], 4);
+         this.pu = Round(this.oth * CHittingParamSet.othSplits[2], 4);
+         this.gr = Round(this.oth * CHittingParamSet.othSplits[3], 4);
+         
+      }
+
+
+      public void CombineLeagueMeans(CHittingParamSet mean0, CHittingParamSet mean1) {
+      // -------------------------------------------------------------
+      // Combine the means for the 2 teams into a single set...
+         this.h = (mean0.h + mean1.h) / 2.0;
+         this.b2 = (mean0.b2 + mean1.b2) / 2.0;
+         this.b3 = (mean0.b3 + mean1.b3) / 2.0;
+         this.hr = (mean0.hr + mean1.hr) / 2.0;
+         this.so = (mean0.so + mean1.so) / 2.0;
+         this.bb = (mean0.bb + mean1.bb) / 2.0;
+         this.oth = 1.0 - (this.h + this.so + this.bb);
+         this.sb = (mean0.sb + mean1.sb) / 2.0;
+         this.fPitBase = (mean0.fPitBase + mean1.fPitBase) / 2.0;
+         this.fSacBunt = (mean0.fSacBunt + mean1.fSacBunt) / 2.0;
+
+      }
+
+
+
+      public void FillBatParas(CBatRealSet batStat, CHittingParamSet lgParam) {
+      // ---------------------------------------------------------------
+      // This is the core parameter calculator for batters.
+         double baseSB, k1, k2;
+         int pa, sf1, ibb1, cs1, so1, hbp1, sh1;
+
+         //With mBatStat
+         // Substitute for missing data. All other stats are
+         // required...
+         sf1 = batStat.sf >= 0 ? batStat.sf : (int)(FAC_SF * batStat.ab);
+         ibb1 = batStat.ibb >= 0 ? batStat.ibb : (int)(FAC_IBB * batStat.bb);
+         cs1 = batStat.cs >= 0 ? batStat.cs : (int)(FAC_CS * batStat.sb);
+         so1 = batStat.so >= 0 ? batStat.so : (int)(FAC_SO * batStat.ab);
+         hbp1 = batStat.hbp >= 0 ? batStat.hbp : (int)(FAC_HBP * batStat.ab);
+         sh1 = batStat.sh >= 0 ? batStat.sh : (int)(FAC_SH * batStat.ab);
+
+      // Comput plate appearances, ie, the 'pa'. Also baseSB...
+      // Also compute credibility factors, k1 and k2...
+         pa = batStat.ab + batStat.bb - ibb1 + hbp1 + sf1 - (int)(sh1 * FAC_SACBUNT);
+         if (pa < 250) k1 = pa / 250; else k1 = 1.0;
+         baseSB = batStat.sb + cs1;
+         if (baseSB < 25) k2 = baseSB / 25; else k2 = 1.0;
+
+      // Now compute the parameters...
+         h = Math.Round(k1 * (div0(batStat.h, pa) - ADJ_FOR_OTHER_HITS) + (1 - k1) * lgParam.h, 4);
+         b2 = Math.Round(k1 * div0(batStat.b2, batStat.h) + (1 - k1) * lgParam.b2, 4);
+         b3 = Math.Round(k1 * div0(batStat.b3, batStat.h) + (1 - k1) * lgParam.b3, 4);
+         hr = Math.Round(k1 * div0(batStat.hr, batStat.h) + (1 - k1) * lgParam.hr, 4);
+         bb = Math.Round(k1 * div0(batStat.bb - batStat.ibb, pa) + (1 - k1) * lgParam.bb, 4);
+         so = Math.Round(k1 * div0(so1, pa) + (1 - k1) * lgParam.so, 4);
+         oth = 1.0 - (h + bb + so);
+         sb = Math.Round(k2 * div0(batStat.sb, baseSB, lgParam.sb) + (1 - k2) * lgParam.sb, 4);
+
+      // Break oth into 'out' categories..
+         fo = oth * othSplits[0];
+         ld = oth * othSplits[1]; 
+         pu = oth * othSplits[2];
+         gr = oth * othSplits[3];
+
+      }
+
+
+      public void FillLgParas(CBatRealSet batStat) {
+      // ----------------------------------------------------------
+      // This fills mLgPara.
+         double pa, baseSB;
+         int sf1, ibb1, cs1, so1, hbp1, sh1;
+
+      // With mBatStat
+      // Substitute for missing data. All other stats are
+      // required...
+         sf1 = batStat.sf >= 0 ? batStat.sf : (int)(FAC_SF * batStat.ab);
+         ibb1 = batStat.ibb >= 0 ? batStat.ibb : (int)(FAC_IBB * batStat.bb);
+         cs1 = batStat.cs >= 0 ? batStat.cs : (int)(FAC_CS * batStat.sb);
+         so1 = batStat.so >= 0 ? batStat.so : (int)(FAC_SO * batStat.ab);
+         hbp1 = batStat.hbp >= 0 ? batStat.hbp : (int)(FAC_HBP * batStat.ab);
+         sh1 = batStat.sh >= 0 ? batStat.sh : (int)(FAC_SH * batStat.ab);
+
+      // Comput plate appearances, ie, the 'pa'. Also baseSB...
+      // Also compute credibility factors, k1 and k2...
+         pa = batStat.ab + batStat.bb - ibb1 + hbp1 + sf1 - (int)(sh1 * FAC_SACBUNT);
+         baseSB = batStat.sb + cs1;
+
+      // Now comput the parameters..
+         h = Math.Round(div0(batStat.h, pa), 4) - ADJ_FOR_OTHER_HITS;
+         b2 = Math.Round(div0(batStat.b2, batStat.h), 4);
+         b3 = Math.Round(div0(batStat.b3, batStat.h), 4);
+         hr = Math.Round(div0(batStat.hr, batStat.h), 4);
+         bb = Math.Round(div0(batStat.bb, pa), 4);
+         so = Math.Round(div0(so1, pa), 4);
+         oth = 1.0 - (h + bb + so);
+         sb = Math.Round(div0(batStat.sb, baseSB), 4);
+ 
+      // Break oth into 'out' categories..
+         fo = oth * othSplits[0];
+         ld = oth * othSplits[1]; 
+         pu = oth * othSplits[2];
+         gr = oth * othSplits[3];
+
+         // These are publicly exposed return values...
+         fSacBunt = FAC_SACBUNT;
+         fPitBase = Math.Round(pa / (batStat.ip3 + batStat.h + batStat.bb), 4);
+
+      }
+
+
+      public void FillPitParas(CPitRealSet pitStat, CHittingParamSet lgPara) {
+      // -------------------------------------------------------------------------
+      // This is the core parameter calculator for pitchers.
+         double k1; //Credibility factor
+         int hr1, bfp;
+
+         // With mPitStat
+         hr1 = pitStat.hr >= 0 ? pitStat.hr : (int)(lgPara.hr * pitStat.h);
+
+         bfp = (int)(lgPara.fPitBase * (pitStat.ip3 + pitStat.h + pitStat.bb));
+         if (bfp < 250) k1 = bfp / 250; else k1 = 1.0;
+
+         h = Math.Round(k1 * (div0(pitStat.h, bfp) - ADJ_FOR_OTHER_HITS) + (1 - k1) * lgPara.h, 4);
+         b2 = lgPara.b2;
+         b3 = lgPara.b3;
+         hr = Math.Round(k1 * div0(hr1, pitStat.h) + (1 - k1) * lgPara.hr, 4);
+         bb = Math.Round(k1 * div0(pitStat.bb, bfp) + (1 - k1) * lgPara.bb, 4);
+         so = Math.Round(k1 * div0(pitStat.so, bfp) + (1 - k1) * lgPara.so, 4);
+         oth = 1.0 - (h + bb + so);
+
+      // Break oth into 'out' categories..
+         fo = oth * othSplits[0];
+         ld = oth * othSplits[1]; 
+         pu = oth * othSplits[2];
+         gr = oth * othSplits[3];
+
+      }
+
+      /// <summary>
+      /// This converts hr, be, b2, etc., to an array to be used by classses that 
+      /// are application-specific-agnostic
+      /// </summary>
+      /// <remarks>
+      /// This impliments an abstract method in CParamSet.
+      /// This s/b a method not persisted storage, because cpara combines 
+      /// values outide the classs.
+      /// </remarks>
+      /// ----------------------------------------------------------------
+      public override double[] GetWidthArray() {
+
+         const double virtualWidth = 1.0;
+         double w1 = 0.0;
+         double[] widths = new double[11];
+
+         // First, compute the widths...
+         w1 += widths[(int)TLR.hr] = h * hr * virtualWidth;
+         widths[(int)TLR.b3] = h * b3 * virtualWidth;
+         //if (widths[(int)TLR.b3] < 1) widths[(int)TLR.b3] = 1;
+         w1 += widths[(int)TLR.b3];
+         w1 += widths[(int)TLR.b2] = h * b2 * virtualWidth;
+         w1 += widths[(int)TLR.b1] =
+            h * virtualWidth
+            - widths[(int)TLR.b2] - widths[(int)TLR.b3] - widths[(int)TLR.hr];
+         w1 += widths[(int)TLR.bb] = (bb + hbp) * virtualWidth;
+         w1 += widths[(int)TLR.so] = so * virtualWidth;
+
+         var oth = virtualWidth - w1;
+         w1 += widths[(int)TLR.fo] = othSplits[0] * oth;
+         w1 += widths[(int)TLR.ld] = othSplits[1] * oth;
+         w1 += widths[(int)TLR.pu] = othSplits[2] * oth;
+         w1 += widths[(int)TLR.gr] = othSplits[3] * oth;          
+
+         return widths;
+
+      }
+
+
+      /// <summary>
+      /// Return a CDiceRoll containing the tLR and point-in-bracket.
+      /// </summary>
+      /// <remarks>This impliments an abstract method in CParamSet</remarks>
+      /// -----------------------------------------------------------------
+      public override CDiceRoll RollTheDice(Random rn1) {
+         
+         TLR tlr;
+         double pib;
+
+         double b1 = h * (1.0 - b2 - b3 - hr);
+         double cum = 0.0;
+         int result = 0;
+       //double[] probs = {0.0, hr*h, b3*h, b2*h, b1, bb, oth, so};
+         double[] probs = {0.0, hr*h, b3*h, b2*h, b1, bb, fo, ld, pu, gr, so};
+         double r = rn1.NextDouble();
+
+         for (int i = 1; i<=10; i++) {
+            cum += probs[i];
+            if (r <= cum) {result = i; break;}
+         }
+         if (result == 0) throw new Exception("Result not found in RollTheDice()");
+         tlr = (TLR)(result);
+         pib = (r - (cum - probs[result])) / probs[result];
+         
+         return new CDiceRoll(tlr, pib, r);
+      }
+
+
+      /// <summary>
+      /// This is intended to be called from the action, <GetTlr>, handler.
+      /// It must return a new CDiceRoll with its 3 elements: TLR, pib, and 
+      /// point overall.
+      /// </summary>
+      /// ------------------------------------------------------------------
+      public override CDiceRoll GetTlr(TLR tlr, Random rn1) {
+
+         double[] probs = GetWidthArray();
+         if ((int)tlr > probs.Length-1) throw new Exception("TLR too large: " + tlr.ToString());
+         double overall = 0.0;
+         for (int i=1; i<(int)tlr; i++) overall += probs[i];
+         double pib = rn1.NextDouble();
+         overall += probs[(int)tlr] * pib;
+         return new CDiceRoll(tlr, pib, overall);
+
+      }
+
+
+      /// <summary>
+      /// Return a Tuple containing the tLR and point-in-bracket.
+      /// For stealing we must return 1,2, 3, or 4.
+      /// </summary>
+      /// <remarks>
+      /// 1 and 2 are for errors, 3 and 4 are safe / out respectively.
+      /// Probabilities differ depending on whether this is steal of home or not. 
+      /// </remarks>
+      /// 
+      public CDiceRoll RollTheDice_Steal(Random rn1, bool home) {
+
+         TLR tlr;
+         double pib;
+
+         int result = 0;
+         double cum = 0.0;
+         double prob = home ? sb / 5.0 : sb;
+         double[] probs;
+         double r = rn1.NextDouble();
+
+         if (home)
+         // Use these prob's for stealing home. Very crude, we devide the 'sb'
+         // parameter by 5...
+            probs = new double[] { 0.0, 0.04, 0.04, sb / 5.0, 1.0 - 0.08 - sb / 5.0 };
+         else
+         // Other than home, just use sb...
+            probs = new double[] { 0.0, 0.025, 0.025, sb, 1.0 - 0.05 - sb };
+
+         for (int i = 1; i <= 4; i++) {
+            cum += probs[i];
+            if (r <= cum) {result = i; break; }
+         }
+         if (result == 0) throw new Exception("Result not found in RollTheDice_Steal()");
+         tlr = (TLR)(result);
+         pib = (r - (cum - probs[result])) / probs[result]; 
+
+         return new CDiceRoll(tlr, pib, cum);
+      }
+
+
+      public double div0(double n, double d) {
+      // -----------------------------------------------------
+         if (d == 0.0) return 0.0;
+         else return n / d;
+      }
+
+
+      public double div0(double n, double d, double def) {
+      // -----------------------------------------------------
+         if (d == 0.0) return def;
+         else return n / d;
+      }
+
+   }   
+      
+
+
+}
+
+

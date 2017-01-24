@@ -1,0 +1,22 @@
+﻿1/9-17
+I added SerializeResults to CGame, for idea of accessing in JavaScript.
+
+11/22-16
+I have gone through and implimented CTeam throughout and got clean compile,
+It has now been (minimally) tested in iOS and CSApp -- it runs!
+
+
+11/17-16:
+I made a new branch (b1) and impliemnted CTeam.
+
+#1605.02:
+Added new class, CTEam, and instantiated a 2-elt array in CGame.
+But have not fully integrated it into game logic.
+
+#1605.01: 
+I consolidated logic to combine batter & pitcher parameters into new method,
+CombineParamsets. It is in CHittingParamset as a static. It is called from InitBatter,
+peplacing logic that was there previously.
+
+
+#1604.02 -- Changes to Updating box scores so it is driven by a List<>.
