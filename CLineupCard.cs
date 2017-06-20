@@ -166,18 +166,22 @@ public class CLineupCard {
 
       int slot0 = g.t[abMng].bat[x].when;
       int pos = g.t[abMng].bat[x].where;
-         
-      if (slot0 != 0) {
-         g.t[abMng].bat[x].when = 0;
-         g.t[abMng].bat[x].where = 0;
-         g.t[abMng].bat[y].when = slot0;
-         g.t[abMng].bat[y].used = true;
-         g.t[abMng].bat[y].where = 0;  //New players go in with NO position
-         g.t[abMng].bat[y].bs.boxName = "  " + g.t[abMng].bat[y].bname;
-         g.t[abMng].linup[slot0] = y;
-         g.t[abMng].who[pos] = 0;
-         int bboxx = g.t[abMng].bat[x].bbox;
-         g.InsertIntoBBox(bboxx, y, abMng);
+
+         if (slot0 != 0) {
+            g.t [abMng].bat [x].when = 0;
+            g.t [abMng].bat [x].where = 0;
+            g.t [abMng].bat [y].when = slot0;
+            g.t [abMng].bat [y].used = true;
+            g.t [abMng].bat [y].where = 0;  //New players go in with NO position
+            g.t [abMng].bat [y].bs.boxName = "  " + g.t [abMng].bat [y].bname;
+            g.t [abMng].linup [slot0] = y;
+            g.t [abMng].who [pos] = 0;
+            if (gameState == GameState.PreGame)
+               g.InitializeBox (abMng);
+            else {
+               int bboxx = g.t [abMng].bat [x].bbox;
+               g.InsertIntoBBox (bboxx, y, abMng);
+            }  
 
       // Replace runners, if any, and batter...
          if (gameState == GameState.Offense) {
@@ -205,8 +209,9 @@ public class CLineupCard {
       if (p1 == 1) {
          int px1 = g.t[abMng].bat[x].px;
          if (px1 == 0)
-            throw new Exception("Attempting to use a non-pitcher as pitcher");
-         g.InsertIntoPBox(px1, abMng);
+            throw new Exception("Use of a non-pitcher as pitcher is not supported.");
+            if (gameState == GameState.PreGame) g.InitializeBox (abMng);
+            else g.InsertIntoPBox(px1, abMng);
          g.t[abMng].curp = px1;
       }
 
@@ -216,8 +221,10 @@ public class CLineupCard {
       g.t[abMng].bat[x].where = p1; //Player x moved to new posn
       g.t[abMng].who[p1] = x; //New posn now has player x.
       if (slot != 0) {
-         //int bboxix = g.t[abMng].bat[x].bbox;
-         g.t[abMng].bat[x].bs.boxName += "," + CGame.posAbbr[p1];
+         if (gameState != GameState.PreGame)
+            g.t[abMng].bat[x].bs.boxName += "," + CGame.posAbbr[p1];
+         else 
+            g.t[abMng].bat[x].bs.boxName = g.t[abMng].bat[x].bname + "," + CGame.posAbbr[p1];
       }     
    }
 

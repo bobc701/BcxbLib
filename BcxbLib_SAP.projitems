@@ -21,6 +21,5 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include="$(MSBuildThisFileDirectory)Comments\Comments.txt" />
-    <Content Include="$(MSBuildThisFileDirectory)Notes1.txt" />
   </ItemGroup>
 </Project>

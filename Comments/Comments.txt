@@ -1,4 +1,15 @@
-﻿1/9-17
+﻿#1706.20
+Error handling added in CEngine.DoList and also in CGame.DoAction.
+All changes in BcxbLib side, as I just reused CGame's ENotifyUser to
+cause an alert to show on UI side.
+
+#1706.19 -- 
+Fixed bug in DoAction where [99] (or 1099) was getting prob for cpara.oth.
+            But that's no good for stealing, or stealing home, so I changed it to 
+            1.0 - cum, which will force r <= cum, which should work for both regular
+            plays and stealing.
+
+1/9-17
 I added SerializeResults to CGame, for idea of accessing in JavaScript.
 
 11/22-16
@@ -12,6 +23,8 @@ I made a new branch (b1) and impliemnted CTeam.
 #1605.02:
 Added new class, CTEam, and instantiated a 2-elt array in CGame.
 But have not fully integrated it into game logic.
+
+#1604.02 -- Changes to Updating box scores so it is driven by a list.
 
 #1605.01: 
 I consolidated logic to combine batter & pitcher parameters into new method,
