@@ -64,7 +64,7 @@ public class CGame {
       public event Action<int> ERefreshBBox;
       public event Action<int> ERefreshPBox;
       public event Action EShowLinescore;
-      public event Action EShowLinescoreFull;
+      public event Action EShowLinescoreFull; //Don't think this is actually used.
       public event Action EInitLinescore;
       public event Action EShowRHE;
 
