@@ -1,4 +1,16 @@
-﻿#1706.20
+﻿5/22'19
+Changed members of CBatBoxSet to property get/set's i/o fields, for Xamarin binding.
+Added operator+ to CBatBoxSet and CPitBoxSet to simplify getting totals.
+Added property get 'IpDisplay' to CPitBOxSet for showing ip3 as X.1, X.2, etc.
+
+
+#1706.27
+Fixed the problem with fielding wheel not displaying labels. On BcxbLib side,
+this involved changing CParamBarFielding's 'description' to a property,
+Description, which assigns description and also parses it into separate labels.
+
+
+#1706.20
 Error handling added in CEngine.DoList and also in CGame.DoAction.
 All changes in BcxbLib side, as I just reused CGame's ENotifyUser to
 cause an alert to show on UI side.
@@ -9,15 +21,15 @@ Fixed bug in DoAction where [99] (or 1099) was getting prob for cpara.oth.
             1.0 - cum, which will force r <= cum, which should work for both regular
             plays and stealing.
 
-1/9-17
+1/9'17
 I added SerializeResults to CGame, for idea of accessing in JavaScript.
 
-11/22-16
+11/22'16
 I have gone through and implimented CTeam throughout and got clean compile,
 It has now been (minimally) tested in iOS and CSApp -- it runs!
 
 
-11/17-16:
+11/17'16:
 I made a new branch (b1) and impliemnted CTeam.
 
 #1605.02:

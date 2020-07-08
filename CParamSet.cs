@@ -1,15 +1,11 @@
 ﻿//#define IOS
 
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using static System.Math;
 #if WINDOWS
    using System.Drawing;
 #elif IOS
-   using CoreGraphics;
-   using UIKit;
+using UIKit;
 #endif
 
 
@@ -28,11 +24,13 @@ namespace BCX.BCXB {
       private double[] barWidths = new double[7];
       public int SegmentCount;
       public string[] SegmentLabels;
-      #if WINDOWS
-         public Color[] SegmentColors;
-      #elif IOS  
-         public UIColor[] SegmentColors;  
-      #endif     
+#if WINDOWS
+      public Color[] SegmentColors;
+#elif IOS
+      public UIColor[] SegmentColors;  
+#elif XF
+      public uint[] SegmentColors;
+#endif     
       public abstract double[] GetWidthArray();
       public abstract CDiceRoll RollTheDice(Random rn1);
       public abstract CDiceRoll GetTlr(TLR tlr, Random rn1);
@@ -52,6 +50,7 @@ namespace BCX.BCXB {
       public double fPitBase;     //Scales 3ip+h+w to bfp
       public double fSacBunt;     //Converts sac bunts to failed sac bunts
       public static double[] othSplits = { .370, .180, .200, .250 };
+      public int complPct; // Pct of season. New 1907.03
 
       //public double[] barWidths = new double[7];
 
@@ -65,6 +64,7 @@ namespace BCX.BCXB {
       private const double FAC_HBP = 0.0062;      //Apply tp AB
       private const double FAC_SH = 0.0071;       //Apply to AB (before FAC_SACBUNT) (Excludes P's)
       private const double ADJ_FOR_OTHER_HITS = 0.015;
+      private const double FAC_SH2 = 0.0077;      //Ratio of Sac bunt attempts to BFP
 
 
       public CHittingParamSet(
@@ -84,9 +84,9 @@ namespace BCX.BCXB {
       // ------------------------------------------------------------------------
          h = 0.0; hr = 0.0; b3 = 0.0; b2 = 0.0; bb = 0.0; so = 0.0;
          oth = 0.0; sb = 0.0;
+
          fo = 0.0; ld = 0.0; pu = 0.0; gr = 0.0;
          SetupSegments();
-
       }
 
 
@@ -95,19 +95,24 @@ namespace BCX.BCXB {
          SegmentCount = 10; //They are numbered 1 to SegmentCount.
          SegmentLabels = new string[] { 
             "n/a", "hr", "3b", "2b", "1b", "bb", "fl", "ld", "pu", "gr", "so" };
-         #if WINDOWS
+#if WINDOWS
             SegmentColors = new Color[] {
                Color.White,
                Color.Red, Color.Yellow, Color.Blue, Color.LightGreen,
                Color.Brown, Color.LightGray, Color.LightGray, Color.LightGray, Color.LightGray, Color.Black};
-         #elif IOS
+#elif IOS
             SegmentColors = new UIColor[] {
                UIColor.White,
                UIColor.Red, UIColor.Yellow, UIColor.Blue, UIColor.Green,
                UIColor.Brown, UIColor.LightGray, UIColor.LightGray, UIColor.LightGray, 
                UIColor.LightGray, UIColor.Black};
-
-         #endif
+#elif XF
+            SegmentColors = new uint[] {
+               0xFFFFFFFF,
+               0xFFFF0000, 0xFFFFFF00, 0xFF0000FF, 0xFF008000,
+               0xFFA52A2A, 0xFFD3D3D3, 0xFFD3D3D3, 0xFFD3D3D3,
+               0xFFD3D3D3, 0xFF000000};
+#endif
 
       }
 
@@ -155,15 +160,33 @@ namespace BCX.BCXB {
 
 
 
-      public void FillBatParas(CBatRealSet batStat, CHittingParamSet lgParam) {
-      // ---------------------------------------------------------------
-      // This is the core parameter calculator for batters.
-         double baseSB, k1, k2;
-         int pa, sf1, ibb1, cs1, so1, hbp1, sh1;
+      public void FillBatParas(CBatRealSet batStat, CHittingParamSet lgParam, char pType) {
+         // ---------------------------------------------------------------
+         // This is the core parameter calculator for batters.
+         // 6/5'19: Added pType arg, '2'=pitcher, for doing pitchers a little diff,
+         // mainly using separate league params, and different cred factor (k1)
+         // ---------------------------------------------------------------
 
-         //With mBatStat
-         // Substitute for missing data. All other stats are
-         // required...
+         double baseSB, k1, k2, adjPa;
+         int sf1, ibb1, cs1, so1, hbp1, sh1;
+
+         // Values used for credibility... 1907.02
+         const double CRED_MIN_1 = 200; //Fully credible pa's for batters
+         const double CRED_MIN_2 = 35;  //Fully credible pa's for pitchers (as batters)
+         const double CRED_MIN_SB = 25; //Fully credible steal attempts
+
+      // ----------------------------------------------------------
+      // pitParam:
+      // This will be in lieu of lgParam, for pitchers. 
+      // It is used only for low credibility pitchers.
+      // We meat-ax this here, and possibly in future, more exact
+      // methodology will be developed.
+      // ----------------------------------------------------------
+         var pitParam = new CHittingParamSet { h = 0.102, b2 = 0.146, b3 = 0.006, hr = 0.044, bb = 0.029, so = 0.422 };
+ 
+      // With mBatStat
+      // Substitute for missing data. All other stats are
+      // required...
          sf1 = batStat.sf >= 0 ? batStat.sf : (int)(FAC_SF * batStat.ab);
          ibb1 = batStat.ibb >= 0 ? batStat.ibb : (int)(FAC_IBB * batStat.bb);
          cs1 = batStat.cs >= 0 ? batStat.cs : (int)(FAC_CS * batStat.sb);
@@ -171,20 +194,41 @@ namespace BCX.BCXB {
          hbp1 = batStat.hbp >= 0 ? batStat.hbp : (int)(FAC_HBP * batStat.ab);
          sh1 = batStat.sh >= 0 ? batStat.sh : (int)(FAC_SH * batStat.ab);
 
-      // Comput plate appearances, ie, the 'pa'. Also baseSB...
+
+      // Compute plate appearances, ie, the 'pa'. Also baseSB...
       // Also compute credibility factors, k1 and k2...
-         pa = batStat.ab + batStat.bb - ibb1 + hbp1 + sf1 - (int)(sh1 * FAC_SACBUNT);
-         if (pa < 250) k1 = pa / 250; else k1 = 1.0;
+      // complPct aded for partial seasons. --1907.03
+      // --------------------------------------------------------
+         double credMin;
+         //pa = batStat.ab + batStat.bb - ibb1 + hbp1 + sf1 - (int)(sh1 * FAC_SACBUNT);
+         adjPa = batStat.pa - batStat.ibb - batStat.sh * (1.0 + FAC_SACBUNT);  //Adjusted PA --1907.04
+
+         credMin = pType == '1' ? (0.01 * lgParam.complPct) * CRED_MIN_1 : (0.01 * lgParam.complPct) * CRED_MIN_2; ;
+         if (adjPa < credMin) k1 = adjPa / credMin; else k1 = 1.0;
+
          baseSB = batStat.sb + cs1;
-         if (baseSB < 25) k2 = baseSB / 25; else k2 = 1.0;
+         credMin = (0.01 * lgParam.complPct) * CRED_MIN_SB;
+         if (baseSB < credMin) k2 = baseSB / credMin; else k2 = 1.0;
 
       // Now compute the parameters...
-         h = Math.Round(k1 * (div0(batStat.h, pa) - ADJ_FOR_OTHER_HITS) + (1 - k1) * lgParam.h, 4);
-         b2 = Math.Round(k1 * div0(batStat.b2, batStat.h) + (1 - k1) * lgParam.b2, 4);
-         b3 = Math.Round(k1 * div0(batStat.b3, batStat.h) + (1 - k1) * lgParam.b3, 4);
-         hr = Math.Round(k1 * div0(batStat.hr, batStat.h) + (1 - k1) * lgParam.hr, 4);
-         bb = Math.Round(k1 * div0(batStat.bb - batStat.ibb, pa) + (1 - k1) * lgParam.bb, 4);
-         so = Math.Round(k1 * div0(so1, pa) + (1 - k1) * lgParam.so, 4);
+         switch (pType) {
+            case '1': //batter
+               h = Math.Round(k1 * (div0(batStat.h, adjPa) - ADJ_FOR_OTHER_HITS) + (1 - k1) * lgParam.h, 4);
+               b2 = Math.Round(k1 * div0(batStat.b2, batStat.h) + (1 - k1) * lgParam.b2, 4);
+               b3 = Math.Round(k1 * div0(batStat.b3, batStat.h) + (1 - k1) * lgParam.b3, 4);
+               hr = Math.Round(k1 * div0(batStat.hr, batStat.h) + (1 - k1) * lgParam.hr, 4);
+               bb = Math.Round(k1 * div0(batStat.bb - batStat.ibb, adjPa) + (1 - k1) * lgParam.bb, 4);
+               so = Math.Round(k1 * div0(so1, adjPa) + (1 - k1) * lgParam.so, 4);
+               break;
+            case '2': //pitcher (as batter)
+               h = Math.Round(k1 * (div0(batStat.h, adjPa) - ADJ_FOR_OTHER_HITS) + (1 - k1) * pitParam.h, 4);
+               b2 = Math.Round(k1 * div0(batStat.b2, batStat.h) + (1 - k1) * pitParam.b2, 4);
+               b3 = Math.Round(k1 * div0(batStat.b3, batStat.h) + (1 - k1) * pitParam.b3, 4);
+               hr = Math.Round(k1 * div0(batStat.hr, batStat.h) + (1 - k1) * pitParam.hr, 4);
+               bb = Math.Round(k1 * div0(batStat.bb - batStat.ibb, adjPa) + (1 - k1) * pitParam.bb, 4);
+               so = Math.Round(k1 * div0(so1, adjPa) + (1 - k1) * pitParam.so, 4);
+               break;
+         }
          oth = 1.0 - (h + bb + so);
          sb = Math.Round(k2 * div0(batStat.sb, baseSB, lgParam.sb) + (1 - k2) * lgParam.sb, 4);
 
@@ -200,7 +244,7 @@ namespace BCX.BCXB {
       public void FillLgParas(CBatRealSet batStat) {
       // ----------------------------------------------------------
       // This fills mLgPara.
-         double pa, baseSB;
+         double adjPa, baseSB;
          int sf1, ibb1, cs1, so1, hbp1, sh1;
 
       // With mBatStat
@@ -213,18 +257,19 @@ namespace BCX.BCXB {
          hbp1 = batStat.hbp >= 0 ? batStat.hbp : (int)(FAC_HBP * batStat.ab);
          sh1 = batStat.sh >= 0 ? batStat.sh : (int)(FAC_SH * batStat.ab);
 
-      // Comput plate appearances, ie, the 'pa'. Also baseSB...
-      // Also compute credibility factors, k1 and k2...
-         pa = batStat.ab + batStat.bb - ibb1 + hbp1 + sf1 - (int)(sh1 * FAC_SACBUNT);
+         // Comput plate appearances, ie, the 'pa'. Also baseSB...
+         // Also compute credibility factors, k1 and k2...
+         //pa = batStat.ab + batStat.bb - ibb1 + hbp1 + sf1 - (int)(sh1 * FAC_SACBUNT);
+         adjPa = batStat.pa - batStat.ibb - batStat.sh * (1.0 + FAC_SACBUNT);  //Adjusted PA --1907.04
          baseSB = batStat.sb + cs1;
 
       // Now comput the parameters..
-         h = Math.Round(div0(batStat.h, pa), 4) - ADJ_FOR_OTHER_HITS;
+         h = Math.Round(div0(batStat.h, adjPa), 4) - ADJ_FOR_OTHER_HITS;
          b2 = Math.Round(div0(batStat.b2, batStat.h), 4);
          b3 = Math.Round(div0(batStat.b3, batStat.h), 4);
          hr = Math.Round(div0(batStat.hr, batStat.h), 4);
-         bb = Math.Round(div0(batStat.bb, pa), 4);
-         so = Math.Round(div0(so1, pa), 4);
+         bb = Math.Round(div0(batStat.bb, adjPa), 4);
+         so = Math.Round(div0(so1, adjPa), 4);
          oth = 1.0 - (h + bb + so);
          sb = Math.Round(div0(batStat.sb, baseSB), 4);
  
@@ -236,8 +281,9 @@ namespace BCX.BCXB {
 
          // These are publicly exposed return values...
          fSacBunt = FAC_SACBUNT;
-         fPitBase = Math.Round(pa / (batStat.ip3 + batStat.h + batStat.bb), 4);
+         fPitBase = Math.Round(adjPa / (batStat.ip3 + batStat.h + batStat.bb), 4);
 
+         this.complPct = batStat.complPct; //1907.03
       }
 
 
@@ -245,20 +291,25 @@ namespace BCX.BCXB {
       // -------------------------------------------------------------------------
       // This is the core parameter calculator for pitchers.
          double k1; //Credibility factor
-         int hr1, bfp;
+         double hr1, adjBfp;
+
+         const double CRED_MIN_BFP = 200; //--1907.02
 
          // With mPitStat
          hr1 = pitStat.hr >= 0 ? pitStat.hr : (int)(lgPara.hr * pitStat.h);
 
-         bfp = (int)(lgPara.fPitBase * (pitStat.ip3 + pitStat.h + pitStat.bb));
-         if (bfp < 250) k1 = bfp / 250; else k1 = 1.0;
+         // complPct added for partial seasons... --1907.03
+         //bfp = (int)(lgPara.fPitBase * (pitStat.ip3 + pitStat.h + pitStat.bb));
+         adjBfp = pitStat.bfp - pitStat.ibb - FAC_SH2 * pitStat.bfp; //This is adjusted BFP --1907.04
+         double credMin = (0.01 * lgPara.complPct) * CRED_MIN_BFP;
+         if (adjBfp < credMin) k1 = adjBfp / credMin; else k1 = 1.0;
 
-         h = Math.Round(k1 * (div0(pitStat.h, bfp) - ADJ_FOR_OTHER_HITS) + (1 - k1) * lgPara.h, 4);
+         h = Math.Round(k1 * (div0(pitStat.h, adjBfp) - ADJ_FOR_OTHER_HITS) + (1 - k1) * lgPara.h, 4);
          b2 = lgPara.b2;
          b3 = lgPara.b3;
          hr = Math.Round(k1 * div0(hr1, pitStat.h) + (1 - k1) * lgPara.hr, 4);
-         bb = Math.Round(k1 * div0(pitStat.bb, bfp) + (1 - k1) * lgPara.bb, 4);
-         so = Math.Round(k1 * div0(pitStat.so, bfp) + (1 - k1) * lgPara.so, 4);
+         bb = Math.Round(k1 * div0(pitStat.bb, adjBfp) + (1 - k1) * lgPara.bb, 4);
+         so = Math.Round(k1 * div0(pitStat.so, adjBfp) + (1 - k1) * lgPara.so, 4);
          oth = 1.0 - (h + bb + so);
 
       // Break oth into 'out' categories..

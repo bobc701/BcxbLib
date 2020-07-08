@@ -74,7 +74,8 @@
       START = 0,
       NEXT = 1,
       PLAY = 2,
-      NONE = -1
+      NONE = -1,
+      OVER = -2
    }
 
    // Special play lists stored in GTAB:
@@ -122,25 +123,101 @@
       public int ab, hr, bi, sb, cs, h, b2, b3, bb, so;
       public int sf, ibb, hbp, sh, pa, ip3;
       public double ave;
+      public int complPct; //new 1907.03
    }
 
    public struct CBatBoxSet {
-   // -----------------------------------------------------------------
+      // -----------------------------------------------------------------
+
       public string boxName;
+      public int bx; //1906.02
       public int ab, r, h, bi, b2, b3, hr, so, bb, sb, cs;
+
+   // These property gets are needed for binding in Xamarin Forms...
+      public string BoxName { get { return boxName; } }
+      public int Ab { get { return ab; } }
+      public int R { get { return r; } }
+      public int H { get { return h; } }
+      public int Bi { get { return bi; } }
+      public int B2 { get { return b2; } }
+      public int B3 { get { return b3; } }
+      public int Hr { get { return hr; } }
+      public int So { get { return so; } }
+      public int Bb { get { return bb; } }
+      public int Sb { get { return sb; } }
+      public int Cs { get { return cs; } }
+
+
+      public static CBatBoxSet operator+(CBatBoxSet bs1, CBatBoxSet bs2) {
+      // ------------------------------------------------------
+         bs1.ab += bs2.ab;
+         bs1.r += bs2.r;
+         bs1.h += bs2.h;
+         bs1.bi += bs2.bi;
+         bs1.hr += bs2.hr;
+         bs1.b2 += bs2.b2;
+         bs1.b3 += bs2.b3;
+         bs1.bb += bs2.bb;
+         bs1.so += bs2.so;
+         bs1.sb += bs2.sb;
+         bs1.cs += bs2.cs;
+         return bs1;
+      }
+
    }
+
 
    public struct CPitRealSet {
    // -----------------------------------------------------------------
-      public int g, gs, w, l, sv, bfp, er, h, hr, so, bb, ip3;
+      public int g, gs, w, l, sv, bfp, er, h, hr, so, bb, ibb, ip3;
       public double era, whip, ip;
    }
 
-   public struct CPitBoxSet
-   {
-      // -----------------------------------------------------------------
+
+   public struct CPitBoxSet {
+   // -----------------------------------------------------------------
       public string boxName;
+      public int bx, px; //1906.02
       public int ip3, r, h, er, so, bb, hr;
+
+   // These property gets are needed for binding in Xamarin Forms...
+      public string BoxName { get { return boxName; } }
+      //public string Ip3 { get { return IpDisplay(ip3); } } //Use 'IpDisplay' for this...
+      public int R { get { return r; } }
+      public int H { get { return h; } }
+      public int Er { get { return er; } }
+      public int So { get { return so; } }
+      public int Bb { get { return bb; } }
+      public int Hr { get { return hr; } }
+
+      public static CPitBoxSet operator+(CPitBoxSet ps1, CPitBoxSet ps2) {
+      // -----------------------------------------------------------------
+         ps1.ip3 += ps2.ip3;
+         ps1.r += ps2.r;
+         ps1.h += ps2.h;
+         ps1.er += ps2.er;
+         ps1.so += ps2.so;
+         ps1.bb += ps2.bb;
+         ps1.hr += ps2.hr;
+         return ps1;
+      }
+
+      public string IpDisplay {
+         // ------------------------------------------------------
+         // Converts ip3 to display value with .1 for 1/3 inn, etc.
+         get {
+            int n = ip3 % 3;
+            int ip = ip3 / 3;
+            switch (n) {
+               case 0: return ip.ToString();
+               case 1: return ip.ToString() + ".1";
+               case 2: return ip.ToString() + ".2";
+               default: return ip.ToString();
+            }
+         }
+
+      }
+
    }
 
 

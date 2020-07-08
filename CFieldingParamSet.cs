@@ -18,13 +18,15 @@ namespace BCX.BCXB {
       public double goodPlayProb, badPlayProb;
       public string description;
       public string fielderName;
+      public string fielderSkill;
       
       private int skill;
+      private string [] aDescrip;
 
    // aPct[0] and aPct[6] are set half way to 0 & 1, repectively.
    // This is arbitrary -- so Fielding bar always shows 2 colors.
       private double[] aPct = { 0.0833, 0.1667, 0.3333, 0.5, 0.6667, 0.8333, 0.9167 };
-
+      
 
       /// <summary>
       /// This constructor takes a skill value (0..6)
@@ -40,12 +42,14 @@ namespace BCX.BCXB {
 
          SegmentCount = 2;
 
-         #if WINDOWS
+#if WINDOWS
             SegmentColors = new Color[] { Color.White, Color.LightGreen, Color.Red };
-         #elif IOS
-            SegmentColors = new UIColor[] { UIColor.White, UIColor.Green, UIColor.Red }; 
-         #endif
-         SegmentLabels = new string[] { "", "", "" };
+#elif IOS
+            SegmentColors = new UIColor[] { UIColor.White, UIColor.Green, UIColor.Red };
+#elif XF
+         SegmentColors = new uint[] { 0xFFFFFFFF, 0xFF008000, 0xFFFF0000 };
+#endif
+         SegmentLabels = new string[] { "X", "1", "2" };
       }
 
 
@@ -57,13 +61,27 @@ namespace BCX.BCXB {
       
          goodPlayProb = 1.0; badPlayProb = 0.0;
          SegmentCount = 2;
-         #if WINDOWS
-            SegmentColors = new Color[] { Color.White, Color.LightGreen, Color.Red };
-         #elif IOS
-            SegmentColors = new UIColor[] { UIColor.White, UIColor.Green, UIColor.Red }; 
-         #endif
-         SegmentLabels = new string[] { "", "", "" };
+#if WINDOWS
+         SegmentColors = new Color[] { Color.White, Color.LightGreen, Color.Red };
+#elif IOS
+         SegmentColors = new UIColor[] { UIColor.White, UIColor.Green, UIColor.Red }; 
+#elif XF
+         SegmentColors = new uint[] { 0xFFFFFFFF, 0xFF008000, 0xFFFF0000 };
+#endif
+         SegmentLabels = new string[] { "X", "1", "2" };
      }
+
+     
+      public string Description {
+         set {
+            description = value;
+            string [] a = description.Split ('/');
+            if (a.Length >= 2) {
+               SegmentLabels [1] = a [0];
+               SegmentLabels [2] = a [1];
+            }
+         }
+      }
 
 
       /// <summary>

@@ -1,11 +1,16 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Text;
 using System.Diagnostics;
+using System.Linq;
+using System.ComponentModel;
+using System.Runtime.CompilerServices;
 
-namespace  BCX.BCXB {
 
-public class CLineupCard {
+namespace BCX.BCXB {
+
+public class CLineupCard : INotifyPropertyChanged { 
 // ===================================================================================== 
   
    /* This is a non-platform specific shadow to the Lineup card form.
@@ -62,9 +67,12 @@ public class CLineupCard {
 
    public CGame g; 
    public int abMng;
-   public List<CBatter> CurrentLineup; //Use 0-8 or 0-9.
-   public List<CBatter> Available;
-      
+   public ObservableCollection<CBatter> CurrentLineup { get; set; } //Use 0-8 or 0-9.
+   public List<CBatter> Available { get; set; }
+   public string TeamNickVis { get => g.t[0].nick; }  // New //1906.03
+   public string TeamNickHome { get => g.t[1].nick; }  // New //1906.03
+
+
    public enum GameState {
       PreGame,
       Offense,
@@ -89,65 +97,80 @@ public class CLineupCard {
       else if (g.ab == abMng) gameState = GameState.Offense;
       else gameState = GameState.Defense;
       SetLineupCard();
-   }
-      
-      
-   /// <summary>
-   /// This fills the structure, CurrentLineup, which is rebuilt on the fly 
-   /// here, rather than being incrementally maintained. 
-   /// </summary>
-   /// 
-   public void SetLineupCard() {
-   
-      CurrentLineup = new List<CBatter>();
-         
-      for (int i=1; i<=9; i++) {
-         int bx = g.t[abMng].linup[i];              
-         CurrentLineup.Add(g.t[abMng].bat[bx]);
-      }
-         
-   // Add non-batting pitcher:
-      int bxp = g.t[abMng].who[1];
-      if (g.t[abMng].bat[ bxp].when == 0) CurrentLineup.Add(g.t[abMng].bat[bxp]); 
-                  
-   // For debugging...   
-      Debug.WriteLine (g.t[abMng].nick + " ---------------------------------");
-      for (int i=1; i<=CGame.SZ_BAT-1; i++) {
-      if (g.t[abMng].bat[i] != null) Debug.WriteLine(i.ToString() + ": " +  g.t[abMng].bat[i].bname);
-      }
-         
-   }
-       
-   /// <summary>
-   /// This filles Available, a List of CBatter.
-   /// </summary>
-   /// 
-   public void GetAvailable() {
 
-      Available = new List<CBatter>();
-      switch (gameState) {
-      case GameState.PreGame: 
-      // List will include all players not in lineup
-         for (int i=1; i<CGame.SZ_BAT; i++) {
-               if (g.t[abMng].bat[i] != null 
-               && !(g.t[abMng].bat[i].when > 0 || g.t[abMng].bat[i].where > 0))
-                  Available.Add(g.t[abMng].bat[i]);                    
-         }
-         break;
-      case GameState.Offense:
-      case GameState.Defense:
-      // List will include all unused players
-         for (int i=1; i<CGame.SZ_BAT; i++) {
-               if (g.t[abMng].bat[i] != null && !g.t[abMng].bat[i].used)
-                  Available.Add(g.t[abMng].bat[i]);                    
-         }
-         break;
-      default:
-         break;   
-            
       }
+
+
+      /// <summary>
+      /// This fills the structure, CurrentLineup, which is rebuilt on the fly 
+      /// here, rather than being incrementally maintained. 
+      /// </summary>
+      /// 
+      public void SetLineupCard() {
+   
+         CurrentLineup = new ObservableCollection<CBatter>();
          
+         for (int i=1; i<=9; i++) {
+            int bx = g.t[abMng].linup[i];              
+            CurrentLineup.Add(g.t[abMng].bat[bx]);
+         }
+         
+      // Add non-batting pitcher:
+         int bxp = g.t[abMng].who[1];
+         if (bxp != 0)
+            if (g.t[abMng].bat[bxp].when == 0) CurrentLineup.Add(g.t[abMng].bat[bxp]);
+
+
+         // For debugging...   
+         //Debug.WriteLine (g.t[abMng].nick + " ---------------------------------");
+         //for (int i=1; i<=CGame.SZ_BAT-1; i++) {
+         //if (g.t[abMng].bat[i] != null) Debug.WriteLine(i.ToString() + ": " +  g.t[abMng].bat[i].bname);
+         //}
+
+         OnPropertyChanged("CurrentLineup");
+
+      }
+
+   
+   public void GetAvailable(char crit) {
+   // --------------------------------------------------------------------
+   // As overhauled 3'19
+   // crit: a=All, p=just pitchers, n=just Non-pitchers
+   // Purpose is to fill Available, a List<CBatter>
+   // --------------------------------------------------------------------
+      //Available = new List<CBatter>();
+      IEnumerable<CBatter> avail = null;
+
+      switch (gameState) {
+         case GameState.PreGame:
+         // List will include all players not in lineup
+            avail = g.t[abMng].bat
+               .Where
+                  (b => b != null && b.when == 0 && b.where == 0 &&
+                  (crit == 'a' || crit == 'p' && b.px > 0 || crit == 'n' && b.px == 0))
+               .OrderBy(b => b.bx);
+            break;
+
+         case GameState.Offense:
+         case GameState.Defense:
+         // List will include all unused players
+            avail = g.t[abMng].bat
+               .Where
+                  (b => b != null && !b.used &&
+                  (crit == 'a' || crit == 'p' && b.px > 0 || crit == 'n' && b.px == 0))
+               .OrderBy(b => b.bx);
+            break;
+
+         default:
+            break;
+
+      }
+         //Available = (ObservableCollection<CBatter>)avail;
+         Available = avail.ToList();
+
+         //foreach (CBatter b in avail) Available.Add(b); 
    }
+
 
 
    /// <summary>
@@ -167,21 +190,23 @@ public class CLineupCard {
       int slot0 = g.t[abMng].bat[x].when;
       int pos = g.t[abMng].bat[x].where;
 
-         if (slot0 != 0) {
-            g.t [abMng].bat [x].when = 0;
-            g.t [abMng].bat [x].where = 0;
-            g.t [abMng].bat [y].when = slot0;
-            g.t [abMng].bat [y].used = true;
-            g.t [abMng].bat [y].where = 0;  //New players go in with NO position
-            g.t [abMng].bat [y].bs.boxName = "  " + g.t [abMng].bat [y].bname;
-            g.t [abMng].linup [slot0] = y;
-            g.t [abMng].who [pos] = 0;
-            if (gameState == GameState.PreGame)
-               g.InitializeBox (abMng);
-            else {
-               int bboxx = g.t [abMng].bat [x].bbox;
-               g.InsertIntoBBox (bboxx, y, abMng);
-            }  
+      if (slot0 != 0) {
+         g.t [abMng].bat [x].when = 0;
+         g.t [abMng].bat [x].where = 0;
+      // Replaced player still avail if game not started...
+         if (gameState == GameState.PreGame) g.t[abMng].bat[x].used = false; 
+         g.t [abMng].bat [y].when = slot0;
+         g.t [abMng].bat [y].used = true;
+         g.t [abMng].bat [y].where = 0;  //New players go in with NO position: will be set in caller
+         g.t [abMng].bat [y].bs.boxName = "  " + g.t [abMng].bat [y].bname;
+         g.t [abMng].linup [slot0] = y;
+         g.t [abMng].who [pos] = 0;
+         if (gameState == GameState.PreGame)
+            g.InitializeBox (abMng);
+         else {
+            int bboxx = g.t [abMng].bat [x].bbox;
+            g.InsertIntoBBox (bboxx, y, abMng);
+         }  
 
       // Replace runners, if any, and batter...
          if (gameState == GameState.Offense) {
@@ -208,18 +233,16 @@ public class CLineupCard {
 
       if (p1 == 1) {
          int px1 = g.t[abMng].bat[x].px;
-         if (px1 == 0)
-            throw new Exception("Use of a non-pitcher as pitcher is not supported.");
-            if (gameState == GameState.PreGame) g.InitializeBox (abMng);
-            else g.InsertIntoPBox(px1, abMng);
+         if (gameState == GameState.PreGame) g.InitializeBox (abMng);
+         else g.InsertIntoPBox(px1, abMng);
          g.t[abMng].curp = px1;
       }
 
-      if (y != 0) g.t[abMng].bat[ y].where = 0; //Player y now has no posn
-      if (p0 != 0) g.t[abMng].who[p0] = 0; //Put no one at current posn
+      if (y != 0) g.t[abMng].bat[y].where = 0; //Player y now has no posn 
+      if (p0 > 0 && p0 < 10) g.t[abMng].who[p0] = 0; //Put no one at current posn
 
       g.t[abMng].bat[x].where = p1; //Player x moved to new posn
-      g.t[abMng].who[p1] = x; //New posn now has player x.
+      if (p1 != 10) g.t[abMng].who[p1] = x; //New posn now has player x.
       if (slot != 0) {
          if (gameState != GameState.PreGame)
             g.t[abMng].bat[x].bs.boxName += "," + CGame.posAbbr[p1];
@@ -251,9 +274,15 @@ public class CLineupCard {
       g.t[abMng].linup[slot0] = y;
       g.t[abMng].linup[slot0 + dir] = x;
       g.InitializeBox(abMng); //Resets box based on current lineup.
-   }           
+   }
+
+      public event PropertyChangedEventHandler PropertyChanged;
+      void OnPropertyChanged([CallerMemberName] string propertyName = "") {
+
+         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+      }
 
 
    }
-   
+
 }

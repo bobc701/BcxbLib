@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Collections.Generic;
 using System.Text;
 using System.Threading.Tasks;
+using System.Linq;
 
 using BCX.SimEngine;
 using BCX.BCXCommon;
@@ -34,11 +35,11 @@ public class CGame {
       public List<TextToSay> lstResults = new List<TextToSay>();
       public List<StatToUpdate> lstBoxUpdates = new List<StatToUpdate>(); //#1604.02
 
-      public enum RunMode {Normal=1, Auto=2, Fast=3, FastEog=4} //(Fast:SAY_INTERVAL=0)
+      public enum RunMode {Normal=1, Auto=2, Fast=3, FastEog=4, FastEOP=5} //(Fast:SAY_INTERVAL=0)
 
       public event Func<short, StreamReader> ERequestModelFile;
       public event Func<string, StreamReader> ERequestEngineFile;
-      public event Func<string, StreamReader> ERequestTeamFileReader;
+      public event Func<string, TextReader> ERequestTeamFileReader;
       public event Func<string, StreamWriter> ERequestTeamFileWriter;
       public event Func<string, StreamWriter> ERequestBoxFileWriter;
 
@@ -100,13 +101,15 @@ public class CGame {
       int sit, up, posn, gplay;
       bool scoringPlay = false;
 
+      public int PosLim => UsingDh ? 10 : 9;
+
       public static string[] PosName = {"field",
          "pitcher", "catcher", "first", "second", "third", "short",
-         "left", "center", "right"};
+         "left", "center", "right", "DH"};
       public static string[] PosNameLong = {"as fielder",
          "as pitcher", "as catcher", "at first base", "at second base", 
          "at third base", "at shortstop", "in left field", "in center field", 
-         "in right field"};
+         "in right field", "as DH"};
       public static string[] posAbbr =
          {"", "p", "c", "1b", "2b", "3b", "ss", "lf", "cf", "rf", "dh"};
       //string[] ordSuffix =
@@ -264,11 +267,11 @@ public class CGame {
       // be instantiated first.
 
       // Instantiate the engine object, mEng,  
-         var fEngine = ERequestEngineFile("CFEng1.bcx");
+         var fEngine = ERequestEngineFile("cfeng1");
          mEng = new CEngine(fEngine);
          mEng.EDoAction += new DDoAction(DoAction);
          mEng.EEngineError += delegate (int n, string list) {
-            ENotifyUser ("Exception in DoList in CEngine: " + n + ": " + list);
+            ENotifyUser?.Invoke("Exception in DoList in CEngine: " + n + ": " + list);
          };
          
          mEng.atLen = atLen;
@@ -553,7 +556,7 @@ public class CGame {
               "list = " + sList + "\r\n" +
               "at = " + at;
             Debug.WriteLine (msg);
-            ENotifyUser (msg);
+            ENotifyUser?.Invoke(msg);
          }
 
       } 
@@ -612,8 +615,9 @@ public class CGame {
          
          EFmtFieldingBar?.Invoke(fpara, txt, t[fl].bat[t[fl].who[p]].bname);
          EPlaceFldgPointer?.Invoke(diceRollFielding, true);
-         fpara.description = txt;
+         fpara.Description = txt; //This sets 'description' and parses it into 2 'SegmentLabel's.
          fpara.fielderName = t[fl].bat[t[fl].who[p]].bname;
+         fpara.fielderSkill = t[fl].bat[t[fl].who[p]].DisplaySkill;
          return res;
       }      
 
@@ -1252,13 +1256,25 @@ public class CGame {
             
                AtBat();
 
+               // ----------------------------------------------
+               // For testing extra innings
+               // ----------------------------------------------
+               //if (inn <= 1) {
+               //   inn = 9;
+               //   rk[1, 0] = 2;
+               //   rk[0, 0] = 2;
+               //   for (int i = 1; i <= 9; i++) { lines[0, i] = 0; lines[1, i] = 0; };
+               //   lines[0, 3] = 2;
+               //   lines[1, 7] = 2;
+               //}
+
                if (eog) {
                   runMode = RunMode.Normal; //Game over so revert to normal mode.
                   //msg = "Final score: " +
                   //   t[0].lineName + " " + rk[0,0].ToString() + ", " +
                   //   t[1].lineName + " " + rk[1,0].ToString();
                   //ShowResults(msg, "\r\n", delay:true);
-                  PlayState = PLAY_STATE.NONE;
+                  PlayState = PLAY_STATE.OVER;
                }
                else
                   PlayState = PLAY_STATE.NEXT;   
@@ -1284,6 +1300,7 @@ public class CGame {
          // #1512.02 -- Fixed this...
          } while (!(
               runMode == RunMode.Normal ||
+              runMode == RunMode.FastEOP ||
              (runMode == RunMode.Auto && eos) ||
              (runMode == RunMode.Fast && eos) ||
               eog));
@@ -1579,6 +1596,7 @@ public class CGame {
                b.bbox = slt;
                t[ab1].xbox[slt] = bx;
                b.bs.boxName = b.bname;
+               b.bs.bx = bx; //1906.02
                if (b.where != 0) b.bs.boxName += "," + aPosName[b.where];
             }
             //2014/4: Out -- why show non-better in batter box?
@@ -1591,10 +1609,14 @@ public class CGame {
          }
          ERefreshBBox?.Invoke(ab1);
 
-      // Pitcher box...
+      // Pitcher box...  //1906.02: This section modified for ps.px.
+         CPitcher p;
          for (int px=1; px<=SZ_PIT-1 && t[ab1].pit[px]!=null; px++) {
-            t[ab1].pit[px].pbox = 0;
+            p = t[ab1].pit[px];
+            p.pbox = 0;
             t[ab1].ybox[px] = 0;
+            p.ps.px = px; //1906.02 
+            p.ps.bx = 0; //1906.02: How to get bx for a pitcher???
          }
          t[ab1].pit[t[ab1].curp].pbox = 1;
          t[ab1].ybox[1] = t[ab1].curp;
@@ -1745,7 +1767,7 @@ public class CGame {
                n = rec.IndexOf(",");
                if (n == 0)
                {
-                  throw new Exception("Invalid format in CFEng2.bcx");
+                  throw new Exception("Invalid format in cfeng2.bcx");
                }
                int ix = int.Parse(rec.Substring(0, n));
                string s = rec.Substring(n + 1);
@@ -1771,7 +1793,7 @@ public class CGame {
                n = rec.IndexOf(",");
                if (n == 0)
                {
-                  throw new Exception("Invalid format in CFEng3.bcx");
+                  throw new Exception("Invalid format in cfeng3.bcx");
                }
                int ix = int.Parse(rec.Substring(0, n));
                string s = rec.Substring(n + 1);
@@ -1779,7 +1801,7 @@ public class CGame {
                // s should have 15 numbers, each encoded a 4 hexadecimal characters.
                if (s.Length != 60)
                {
-                  throw new Exception("Invalid format in CFEng3.bcx");
+                  throw new Exception("Invalid format in cfeng3.bcx");
                }
 
                // Now convert the 15 hex numbers that are encoded in s...
@@ -1932,12 +1954,12 @@ public class CGame {
 
  
 
-   public StreamReader GetTeamFileReader (string fName) {
+   public TextReader GetTeamFileReader (string fName) {
    // ------------------------------------------------------------------
    // This allows other classes, like forms, to have access to the event...   
       if (fName == null || fName == "") 
          throw new Exception("File name is missing in GetTeamFileReader");
-      StreamReader f = ERequestTeamFileReader(fName);
+      TextReader f = ERequestTeamFileReader(fName);
       return f;
 
    }
@@ -2035,7 +2057,7 @@ public class CGame {
    private List<StringBuilder> LoadRoster(string sFile) {
  
       var roster = new List<StringBuilder>();
-      using (StreamReader f = ERequestTeamFileReader(sFile)) {
+      using (TextReader f = ERequestTeamFileReader(sFile)) {
  
          while ((rec = f.ReadLine()) != null) {
             roster.Add(new StringBuilder(rec));
@@ -2198,11 +2220,14 @@ public class CGame {
    /// 
    public string ValidateDefense(side ab) {
       string msg = "";
-      for (int pos = 1; pos <= 9; pos++) {
-         if (t[(int)ab].who[pos] == 0) {
+      CTeam t1 = t[(int)ab];
+
+   // Check for a player at each position 1..9 or 10...
+      for (int pos = 1; pos <= PosLim; pos++) {
+         if (t1.who[pos] == 0)
             msg += "No player at position: " + CGame.posAbbr[pos] + "\r\n";
-         }
       }
+  
       return msg;
    }
 
