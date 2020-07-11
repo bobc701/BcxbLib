@@ -151,14 +151,15 @@ namespace BCX.BCXB {
             b.px = 0; //See below, this is assigned for pitchers.
             b.sidex = (side)ab; //Tells which team he's on, 0 or 1.
 
-            if (ply.pitchingStats != null) {
+            if (ply.Playercategory == 'P' && ply.pitchingStats != null) {
                // It's a Pitcher record.
+               // Note: 'B' type players CAN have pitchingStats, but we ignore that.
                px++; //Initialized to 0, so starts with 1.
                if (px == 1) curp = 1;  //First pitcher listed starts today.
                if (px >= SZ_PIT) throw new Exception("Too many pitchers in " + teamTag);
                p = pit[px] = new CPitcher();
                b.px = px;
-               p.pname = ply.UseName;
+               p.pname = ply.UseName; 
 
                FillPitStats(ply.pitchingStats, ref p.pr); //Continue with same value of ptr...
                p.par.FillPitParas(p.pr, lgMean);
