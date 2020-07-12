@@ -189,7 +189,7 @@ namespace BCX.BCXB {
          br.h = stats.h ?? 0;
          br.ave = br.ab > 0 ? Math.Round((double)br.h / (double)br.ab, 3) : 0.0;
          br.b2 = stats.b2 ?? 0; ;
-         br.b3 = stats.bb ?? 0;
+         br.b3 = stats.b3 ?? 0;
          br.bb = stats.bb ?? 0;
          br.ibb = stats.ibb ?? 0;
          br.so = stats.so ?? 0;
