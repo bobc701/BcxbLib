@@ -137,6 +137,7 @@ namespace BCX.BCXB {
             b = bat[bx] = new CBatter(g);
             //if (bx > 25) MessageBox.Show("Too many batters in " + sTeam);
             b.bname = ply.UseName;
+            b.bname2 = ply.UseName2;
             b.skillStr = ply.SkillStr;
 
             FillBatStats(ply.battingStats , ref b.br);
@@ -159,7 +160,8 @@ namespace BCX.BCXB {
                if (px >= SZ_PIT) throw new Exception("Too many pitchers in " + teamTag);
                p = pit[px] = new CPitcher();
                b.px = px;
-               p.pname = ply.UseName; 
+               p.pname = ply.UseName;
+               p.pname2 = ply.UseName2;
 
                FillPitStats(ply.pitchingStats, ref p.pr); //Continue with same value of ptr...
                p.par.FillPitParas(p.pr, lgMean);
@@ -180,62 +182,62 @@ namespace BCX.BCXB {
       /// ----------------------------------------------------------------
       private void FillBatStats(DTO_BattingStats stats, ref CBatRealSet br) {
 
-         br.pa = stats.pa ?? 0;
-         br.ab = stats.ab ?? 0;
-         br.hr = stats.hr ?? 0;
-         br.bi = stats.rbi ?? 0;
-         br.sb = stats.sb ?? 0;
-         br.cs = stats.cs ?? 0;
-         br.h = stats.h ?? 0;
+         br.pa = stats.pa;
+         br.ab = stats.ab;
+         br.hr = stats.hr;
+         br.bi = stats.rbi;
+         br.sb = stats.sb;
+         br.cs = stats.cs;
+         br.h = stats.h;
          br.ave = br.ab > 0 ? Math.Round((double)br.h / (double)br.ab, 3) : 0.0;
-         br.b2 = stats.b2 ?? 0; ;
-         br.b3 = stats.b3 ?? 0;
-         br.bb = stats.bb ?? 0;
-         br.ibb = stats.ibb ?? 0;
-         br.so = stats.so ?? 0;
+         br.b2 = stats.b2; ;
+         br.b3 = stats.b3;
+         br.bb = stats.bb;
+         br.ibb = stats.ibb;
+         br.so = stats.so;
 
       }
 
 
       private void FillPitStats(DTO_PitchingStats stats, ref CPitRealSet pr) {
-         // -------------------------------------------------------------------
-         // GetHex returns -1 if db_stats is all F's -- this indicates missing.
+      // -------------------------------------------------------------------
+      // GetHex returns -1 if db_stats is all F's -- this indicates missing.
 
-         pr.g = stats.g ?? 0;
-         pr.gs = stats.gs ?? 0;
-         pr.w = stats.w ?? 0;
-         pr.l = stats.l ?? 0;
-         pr.bfp = stats.bfp ?? 0;
-         pr.ip3 = stats.ipOuts ?? 0;
-         pr.h = stats.h ?? 0;
-         pr.er = stats.er ?? 0;
-         pr.hr = stats.hr ?? 0;
-         pr.so = stats.so ?? 0;
-         pr.bb = stats.bb ?? 0;
-         pr.ibb = stats.ibb ?? 0;
-         pr.sv = stats.sv ?? 0;
+         pr.g = stats.g;
+         pr.gs = stats.gs;
+         pr.w = stats.w;
+         pr.l = stats.l;
+         pr.bfp = stats.bfp;
+         pr.ip3 = stats.ipOuts;
+         pr.h = stats.h;
+         pr.er = stats.er;
+         pr.hr = stats.hr;
+         pr.so = stats.so;
+         pr.bb = stats.bb;
+         pr.ibb = stats.ibb;
+         pr.sv = stats.sv;
          pr.era = pr.ip3 == 0.0 ? 0.0 : pr.er / ((double)pr.ip3 / 3.0) * 9.0;
       }
 
 
       private void FillLgStats(DTO_BattingStats stats, int complPct, ref CBatRealSet lgStats) {
-         // ---------------------------------------------------------------------
-         lgStats.pa = stats.pa ?? 0;
-         lgStats.ab = stats.ab ?? 0;
-         lgStats.h = stats.h ?? 0;
-         lgStats.b2 = stats.b2 ?? 0;
-         lgStats.b3 = stats.b3 ?? 0;
-         lgStats.hr = stats.hr ?? 0;
-         lgStats.bi = stats.rbi ?? 0;
-         lgStats.so = stats.so ?? 0;
-         lgStats.sh = stats.sh ?? 0;
-         lgStats.sf = stats.sf ?? 0;
-         lgStats.bb = stats.bb ?? 0;
-         lgStats.ibb = stats.ibb ?? 0;
-         lgStats.hbp = stats.hbp ?? 0;
-         lgStats.sb = stats.sb ?? 0;
-         lgStats.cs = stats.cs ?? 0;
-         lgStats.ip3 = stats.ipOuts ?? 0;
+      // ---------------------------------------------------------------------
+         lgStats.pa = stats.pa;
+         lgStats.ab = stats.ab;
+         lgStats.h = stats.h;
+         lgStats.b2 = stats.b2;
+         lgStats.b3 = stats.b3;
+         lgStats.hr = stats.hr;
+         lgStats.bi = stats.rbi;
+         lgStats.so = stats.so;
+         lgStats.sh = stats.sh;
+         lgStats.sf = stats.sf;
+         lgStats.bb = stats.bb;
+         lgStats.ibb = stats.ibb;
+         lgStats.hbp = stats.hbp;
+         lgStats.sb = stats.sb;
+         lgStats.cs = stats.cs;
+         lgStats.ip3 = stats.ipOuts;
          lgStats.complPct = complPct; 
 
          // Batting ave just a calc...

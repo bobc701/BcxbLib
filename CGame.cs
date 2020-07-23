@@ -1595,7 +1595,7 @@ public class CGame {
             if (slt > 0) {
                b.bbox = slt;
                t[ab1].xbox[slt] = bx;
-               b.bs.boxName = b.bname;
+               b.bs.boxName = b.bname2;
                b.bs.bx = bx; //1906.02
                if (b.where != 0) b.bs.boxName += "," + aPosName[b.where];
             }

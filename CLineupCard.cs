@@ -198,7 +198,7 @@ public class CLineupCard : INotifyPropertyChanged {
          g.t [abMng].bat [y].when = slot0;
          g.t [abMng].bat [y].used = true;
          g.t [abMng].bat [y].where = 0;  //New players go in with NO position: will be set in caller
-         g.t [abMng].bat [y].bs.boxName = "  " + g.t [abMng].bat [y].bname;
+         g.t [abMng].bat [y].bs.boxName = "  " + g.t [abMng].bat [y].bname2;
          g.t [abMng].linup [slot0] = y;
          g.t [abMng].who [pos] = 0;
          if (gameState == GameState.PreGame)
@@ -247,7 +247,7 @@ public class CLineupCard : INotifyPropertyChanged {
          if (gameState != GameState.PreGame)
             g.t[abMng].bat[x].bs.boxName += "," + CGame.posAbbr[p1];
          else 
-            g.t[abMng].bat[x].bs.boxName = g.t[abMng].bat[x].bname + "," + CGame.posAbbr[p1];
+            g.t[abMng].bat[x].bs.boxName = g.t[abMng].bat[x].bname2 + "," + CGame.posAbbr[p1];
       }     
    }
 

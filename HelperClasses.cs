@@ -248,7 +248,7 @@
     */
   
       public CGame g;
-      public string bname;
+      public string bname, bname2;
       public CBatRealSet br;
       public CBatBoxSet bs;
       public int when, where;
@@ -362,6 +362,7 @@
       {
          // --------------------------------------------------------------
          bname = b1.bname;
+         bname2 = b1.bname2;
          br = b1.br; //Note: we can use a shallow copy here.
          bs = b1.bs; //Shallow copy
          when = b1.when;
@@ -380,7 +381,7 @@
 
    public class CPitcher {
       // -----------------------------------------------------------------
-      public string pname;
+      public string pname, pname2;
       public CPitRealSet pr;
       public CPitBoxSet ps;
       public int pbox;
@@ -391,6 +392,7 @@
       public void Copy(CPitcher p1) {
       // --------------------------------------------------------------
          pname = p1.pname;
+         pname2 = p1.pname2;
          pr = p1.pr;   //Note: we can use a shallow copy here.
          ps = p1.ps;   //Shallow copy
          pbox = p1.pbox;
