@@ -1,5 +1,6 @@
 ﻿8/27'20
 Branch dev5
+This is a test change.
 
 5/22'19
 Changed members of CBatBoxSet to property get/set's i/o fields, for Xamarin binding.
