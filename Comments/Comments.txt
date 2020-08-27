@@ -1,4 +1,7 @@
-﻿5/22'19
+﻿8/27'20
+Branch dev5
+
+5/22'19
 Changed members of CBatBoxSet to property get/set's i/o fields, for Xamarin binding.
 Added operator+ to CBatBoxSet and CPitBoxSet to simplify getting totals.
 Added property get 'IpDisplay' to CPitBOxSet for showing ip3 as X.1, X.2, etc.
