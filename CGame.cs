@@ -1343,6 +1343,11 @@ public class CGame {
       // bp's and pp's have already been weighted for credibility...
       // #1605.01: All the logic consolidated into CombineParameters.
          int i = t[ab].linup[t[ab].slot], j = t[fl].curp;
+
+   // Note: Change for custom teams...
+   // Here, cmean must be recalc'd based on batter and pitcher's own lgMeans
+      // cmean.CombineLeagueMeans(CBatter's lgmean, pitcher'switch lgMean))
+
          cpara.CombineParameters(t[ab].bat[i].par, t[fl].pit[j].par, cmean);
 
          ClearResults();
