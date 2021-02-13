@@ -104,9 +104,11 @@ namespace BCX.BCXB {
          teamTag = ros.Team + ros.YearID.ToString();
          usesDhDefault = ros.UsesDhDefault;
 
-         FillLgStats(ros.leagueStats, ros.ComplPct, ref lgStats);
-         lgMean.FillLgParas(lgStats);
-         lgMean.h /= CGame.fMean0; // This applies the fudge factor...   
+      // This here is obs replaced by Meld calc at ab-time.
+      // There is now separate lgMeans for each batter & pitcher
+         //FillLgStats(ros.leagueStats, ros.ComplPct, ref lgStats);
+         //lgMean.FillLgParas(lgStats);
+         //lgMean.h /= CGame.fMean0; // This applies the fudge factor...   
 
        // Player records (batter & pitcher)...
          bx = 0;
@@ -139,9 +141,15 @@ namespace BCX.BCXB {
             b.bname = ply.UseName;
             b.bname2 = ply.UseName2;
             b.skillStr = ply.SkillStr;
+            
+            // League-level stuff for this batter... (#2101.01)
+            FillLgStats(ply.leagueStats, ros.ComplPct, ref b.lgBr);
+            //b.lgPar.FillBatParas(b.lgBr, b.lgPar, ply.Playercategory switch { 'B'=>'1', 'P'=>'2' });
+            b.lgPar.FillLgParas(b.lgBr);
 
+            // Batter-level stuff for this batter... (#2101.01)
             FillBatStats(ply.battingStats , ref b.br);
-            b.par.FillBatParas(b.br, lgMean, ply.Playercategory == 'B' ? '1' : '2');
+            b.par.FillBatParas(b.br, b.lgPar, ply.Playercategory switch { 'B'=>'1', 'P'=>'2' }); 
 
             b.when = (slot == 10 ? 0 : slot);
             if (slot > 0 && slot <= 9) linup[slot] = bx; //So 10 (non-hitting pitcher) is slot 0
@@ -163,8 +171,11 @@ namespace BCX.BCXB {
                p.pname = ply.UseName;
                p.pname2 = ply.UseName2;
 
+            // League-level stuff for this pitcher... (#2101.01)
+               p.lgPar.FillLgParas(b.lgBr);
+
                FillPitStats(ply.pitchingStats, ref p.pr); //Continue with same value of ptr...
-               p.par.FillPitParas(p.pr, lgMean);
+               p.par.FillPitParas(p.pr, b.lgPar); //#2101.01 was lgmean //Yes 'b.' correct here
 
                b.px = p.px = px;
                p.sidex = (side)ab;
@@ -221,9 +232,14 @@ namespace BCX.BCXB {
 
 
       private void FillLgStats(DTO_BattingStats stats, int complPct, ref CBatRealSet lgStats) {
-      // ---------------------------------------------------------------------
-         lgStats.pa = stats.pa;
-         lgStats.ab = stats.ab;
+      // ---------------------------------------------------------------------------
+      // Nore: In the database, in Batting table, PA is null for all years until 2020.
+      // But the SP that builds LeagueStats table has logic to use ab+bb+hbp+sh+sf is
+      // PA is null.
+      // ----------------------------------------------------------------------------
+      
+         lgStats.pa = stats.pa; //See Note, above
+         lgStats.ab = stats.ab; 
          lgStats.h = stats.h;
          lgStats.b2 = stats.b2;
          lgStats.b3 = stats.b3;

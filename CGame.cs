@@ -1347,8 +1347,10 @@ public class CGame {
    // Note: Change for custom teams...
    // Here, cmean must be recalc'd based on batter and pitcher's own lgMeans
       // cmean.CombineLeagueMeans(CBatter's lgmean, pitcher'switch lgMean))
-
-         cpara.CombineParameters(t[ab].bat[i].par, t[fl].pit[j].par, cmean);
+         cpara.CombineParameters(
+            t[ab].bat[i].par, t[ab].bat[i].lgPar, 
+            t[fl].pit[j].par, t[fl].pit[j].lgPar, 
+            cmean);
 
          ClearResults();
          punch(nutshell(), 2, pause:false);  //#150715: Made nutshell a fn and reorganized this

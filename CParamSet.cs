@@ -117,19 +117,30 @@ namespace BCX.BCXB {
       }
 
       public void CombineParameters(
-         CHittingParamSet bpar, CHittingParamSet ppar, CHittingParamSet mean) {
+         CHittingParamSet bpar, CHittingParamSet bLgMean, 
+         CHittingParamSet ppar, CHittingParamSet pLgMean, 
+         CHittingParamSet cmean) {
       // --------------------------------------------------------------------
-      // #1605.01:
+      // #2101.01 - This was overhauled to use Meld.
       // This is where batter & pitcher parameters are combined.
       // bpar is batter's parameters, ppar is pitcher's.
-      // Also uses mean, which is league mean.
+      // Also uses bLgMean & pLgMean, which which are b's and p's league mean.
       // --------------------------------------------------------------------
-         this.h = Round(bpar.h * ppar.h / mean.h, 4);
-         this.bb = Round(bpar.bb * ppar.bb / mean.bb, 4);
-         this.so = Round(bpar.so * ppar.so / mean.so, 4);
+         //this.h = Round(bpar.h * ppar.h / mean.h, 4);
+         //this.bb = Round(bpar.bb * ppar.bb / mean.bb, 4);
+         //this.so = Round(bpar.so * ppar.so / mean.so, 4);
+
+         this.h = Meld1(bpar.h, bLgMean.h, ppar.h, pLgMean.h);
+         this.bb = Meld1(bpar.bb, bLgMean.bb, ppar.bb, pLgMean.bb);
+         this.so = Meld1(bpar.so, bLgMean.so, ppar.so, pLgMean.h);
+
          this.b2 = bpar.b2;
          this.b3 = bpar.b3;
-         this.hr = Round(bpar.hr * ppar.hr / mean.hr, 4);
+
+         //this.hr = Round(bpar.hr * ppar.hr / mean.hr, 4);
+         this.hr = Meld1(bpar.hr, bLgMean.hr, ppar.hr, pLgMean.hr);
+
+
          this.oth = Round(1.0 - (this.h + this.bb + this.so), 4);
          this.sb = bpar.sb;
 
@@ -138,13 +149,50 @@ namespace BCX.BCXB {
          this.ld = Round(this.oth * CHittingParamSet.othSplits[1], 4);
          this.pu = Round(this.oth * CHittingParamSet.othSplits[2], 4);
          this.gr = Round(this.oth * CHittingParamSet.othSplits[3], 4);
-         
+
+      // Need to compute 'cmean' for backward compat for drawing disk purpose.
+      // Otherwise 'cmean' is no longer used, replaced by 'Meld'.
+         cmean.CombineLeagueMeans(bLgMean, pLgMean);
+
+      }
+
+
+      public double Meld1(double B, double BL, double P, double PL) {
+      // -----------------------------------------------------------
+         /* This method compares batter (B) & pitcher (P) to their own league 
+          * norms (BL & PL), then multiplies the combined ratio (X) times the combine
+          * league norn (CL)
+          */
+         if (B <= BL || P <= PL) {
+            double X = (B / BL) * (P / PL);
+            double CL = 0.5 * (BL + PL);
+            double ans = X * CL;
+            if (ans < 1.0) return ans;
+         }
+         return 1.0 - Meld1(1.0 - B, 1.0 - BL, 1.0 - P, 1.0 - PL);
+      }
+
+
+      public double Meld2(double B, double BL, double P, double PL) {
+      // ------------------------------------------------------------
+         /* This method compares batter (B) & pitcher (P) to the
+          * combined league norm (CL), then multiplies the combined ratio (X) times the combine
+          * league norn (CL)
+          */
+         double CL = 0.5 * (BL + PL);
+         if (B <= CL || P <= PL) {
+            double X = (B / CL) * (P / CL);
+            double ans = X * CL;
+            if (ans < 1.0) return ans;
+         }
+         return 1.0 - Meld2(1.0 - B, 1.0 - BL, 1.0 - P, 1.0 - PL);
       }
 
 
       public void CombineLeagueMeans(CHittingParamSet mean0, CHittingParamSet mean1) {
-      // -------------------------------------------------------------
-      // Combine the means for the 2 teams into a single set...
+         // -------------------------------------------------------------
+         // #2101.01: This appears to be obs, no refs
+         // Combine the means for the 2 teams into a single set...
          this.h = (mean0.h + mean1.h) / 2.0;
          this.b2 = (mean0.b2 + mean1.b2) / 2.0;
          this.b3 = (mean0.b3 + mean1.b3) / 2.0;

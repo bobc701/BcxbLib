@@ -124,6 +124,8 @@
       public int sf, ibb, hbp, sh, pa, ip3;
       public double ave;
       public int complPct; //new 1907.03
+
+      //public int pa => pa == 0 ? ab + bb + hbp + sh + sf; }
    }
 
    public struct CBatBoxSet {
@@ -250,11 +252,13 @@
       public CGame g;
       public string bname, bname2;
       public CBatRealSet br;
+      public CBatRealSet lgBr; //new #2101.01
       public CBatBoxSet bs;
       public int when, where;
       public bool used = false;
       public int bbox;
-      public CHittingParamSet par = new CHittingParamSet();
+      public CHittingParamSet par = new();
+      public CHittingParamSet lgPar = new(); //new #2101.01
       public string skillStr = "---------";
       public int bx; //Should match index in bat
       public int px; //Index of this player in pitcher arrays
@@ -383,9 +387,12 @@
       // -----------------------------------------------------------------
       public string pname, pname2;
       public CPitRealSet pr;
+      public CPitRealSet lgPr; //New #2101.01
       public CPitBoxSet ps;
       public int pbox;
-      public CHittingParamSet par = new CHittingParamSet();
+      public CHittingParamSet par = new();
+      public CHittingParamSet lgPar = new(); //New #2101.01
+
       public int px; //Should match index in pit.
       public side sidex; //Tells  whichteam he's on, 0 or 1
 

@@ -24,6 +24,7 @@ namespace BCX.BCXB {
 
 
    public class DTO_PlayerInfo {
+
       public string UseName { get; set; }
       public string UseName2 { get; set; }
       public string SkillStr { get; set; }
@@ -34,10 +35,12 @@ namespace BCX.BCXB {
       public int posnDh { get; set; }
       public DTO_BattingStats battingStats { get; set; }
       public DTO_PitchingStats pitchingStats { get; set; } //(if 2, null if 1)
+      public DTO_BattingStats leagueStats { get; set; }    //new for b12, custom teams
    }
 
-
    public class DTO_BattingStats {
+      public string ZTeam { get; set; }
+      public int yearID { get; set; }
       public int pa { get; set; }
       public int ab { get; set; }
       public int h { get; set; }
