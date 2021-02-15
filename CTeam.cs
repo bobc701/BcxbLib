@@ -5,6 +5,8 @@ using System.IO;
 using BCX.BCXCommon;
 using System.Linq;
 
+using BcxbDataAccess;
+
 namespace BCX.BCXB {
 
    public class CTeam {

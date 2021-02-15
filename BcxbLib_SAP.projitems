@@ -17,7 +17,6 @@
     <Compile Include="$(MSBuildThisFileDirectory)CLineupCard.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)CParamSet.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)CTeam.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)DTO_TeamRoster.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)HelperClasses.cs" />
   </ItemGroup>
   <ItemGroup>
